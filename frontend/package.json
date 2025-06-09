@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@bitauth/libauth": "^3.0.0",
+    "@quasar/extras": "^1.17.0",
+    "axios": "^1.9.0",
+    "cashscript": "^0.10.5",
+    "pinia": "^3.0.2",
+    "socket.io-client": "^4.8.1"
+  }
+}
