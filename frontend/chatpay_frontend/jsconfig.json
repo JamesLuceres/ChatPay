@@ -1,0 +1,14 @@
+{
+  // "extends": "./quasar/tsconfig.json",
+  "include": [
+    "src/pages/LoginPage.vue",
+    "src/pages/RegisterPage.vue",
+    "src/pages/RoomPage.vue",
+    "src/pages/PageNotFound.vue",
+    "src/router/**/*.js",
+    "src/layouts/**/*.vue",
+    "src/components/**/*.vue",
+    "src/store/**/*.js",
+    "src/main.js"
+  ]
+}
