@@ -10,7 +10,7 @@ export default boot(({ app }) => {
 
   // Interceptor: attach access token to every request (if present)
   axios.interceptors.request.use(config => {
-    const token = localStorage.getItem('chatpay_access_token')
+    const token = localStorage.getItem('access')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }

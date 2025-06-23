@@ -3,6 +3,7 @@
 
 import { defineConfig } from '#q-app/wrappers'
 import { Notify } from 'quasar'
+import path from 'path'
 
 export default defineConfig((/* ctx */) => {
   return {
@@ -12,7 +13,7 @@ export default defineConfig((/* ctx */) => {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
-    boot: ['axios'],
+    boot: ['axios', 'buffer'],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
     css: ['app.scss'],
@@ -34,8 +35,8 @@ export default defineConfig((/* ctx */) => {
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#build
     build: {
       target: {
-        browser: ['es2022', 'firefox115', 'chrome115', 'safari14'],
-        node: 'node20',
+        browser: ['es2022', 'firefox115', 'chrome115', 'safari15'],
+        node: 'es2022',
       },
 
       vueRouterMode: 'hash', // available values: 'hash', 'history'
@@ -54,27 +55,173 @@ export default defineConfig((/* ctx */) => {
       // polyfillModulePreload: true,
       // distDir
 
-      // extendViteConf (viteConf) {},
-      // viteVuePluginOptions: {},
+      extendViteConf(viteConf) {
+        // Ensure esbuild config exists before modifying
+        if (!viteConf.esbuild) {
+          viteConf.esbuild = {}
+        }
+        viteConf.esbuild.supported = {
+          'top-level-await': true,
+        }
+
+        // Ensure optimizeDeps config exists
+        if (!viteConf.optimizeDeps) {
+          viteConf.optimizeDeps = {}
+        }
+
+        // Exclude problematic dependencies from Vite's optimizer
+        const exclude = [
+          'cashscript',
+          '@psf/bitcoincashjs-lib',
+          '@psf/bch-js', // Add this too
+          '@bitauth/libauth',
+          'electrum-cash',
+          'debug', // Keep debug in exclude for now
+          // 'isomorphic-ws',
+        ]
+        viteConf.optimizeDeps.exclude = [
+          ...(viteConf.optimizeDeps.exclude || []).filter((dep) => dep !== '@psf/bch-js'),
+        ]
+
+        // Include dependencies that need to be pre-bundled
+        const include = [
+          // 'debug', // Remove debug from include since it's causing issues
+          'isomorphic-ws',
+        ]
+        viteConf.optimizeDeps.include = [...(viteConf.optimizeDeps.include || []), '@psf/bch-js']
+
+        // Add alias to fix module import issues
+        if (!viteConf.resolve) {
+          viteConf.resolve = {}
+        }
+        if (!viteConf.resolve.alias) {
+          viteConf.resolve.alias = {}
+        }
+
+        // Fix various module aliases
+        viteConf.resolve.alias.delay = 'delay/index.js'
+        viteConf.resolve.alias['fast-deep-equal'] = 'fast-deep-equal/index.js'
+        viteConf.resolve.alias['events'] = 'events'
+
+        // Fix debug module import issue
+        viteConf.resolve.alias['debug'] = 'debug/src/browser.js'
+
+        // 1) Alias the browser build → the CJS entry
+        viteConf.resolve.alias['isomorphic-ws/browser.js'] = path.resolve(
+          __dirname,
+          'node_modules/isomorphic-ws/index.js',
+        )
+
+        // Configure CommonJS options
+        viteConf.build = viteConf.build || {}
+        viteConf.build.commonjsOptions = {
+          ...(viteConf.build.commonjsOptions || {}),
+          defaultIsModuleExports: ['isomorphic-ws', 'debug'],
+          transformMixedEsModules: true, // This helps with mixed module types
+        }
+
+        // Add define to handle Node.js globals in browser
+        viteConf.define = {
+          ...(viteConf.define || {}),
+          global: 'globalThis',
+          'process.env.NODE_DEBUG': JSON.stringify(''),
+          'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+          'process.browser': true,
+          'process.version': JSON.stringify(''),
+          'process.versions': JSON.stringify({}),
+        }
+
+        // Add Node.js polyfills
+        if (!viteConf.resolve.alias) {
+          viteConf.resolve.alias = {}
+        }
+
+        // Add more comprehensive polyfills
+        Object.assign(viteConf.resolve.alias, {
+          // Existing aliases
+          delay: 'delay/index.js',
+          'fast-deep-equal': 'fast-deep-equal/index.js',
+          events: 'events',
+          debug: 'debug/src/browser.js',
+          'isomorphic-ws/browser.js': path.resolve(
+            __dirname,
+            'node_modules/isomorphic-ws/index.js',
+          ),
+
+          // Add Node.js polyfills
+          util: 'util',
+          stream: path.resolve(__dirname, 'node_modules/stream-browserify'),
+          buffer: 'buffer',
+          crypto: path.resolve(__dirname, 'node_modules/crypto-browserify'),
+          assert: path.resolve(__dirname, 'node_modules/assert/'),
+          http: 'stream-http',
+          https: 'https-browserify',
+          os: 'os-browserify/browser',
+          url: 'url',
+          querystring: 'querystring-es3',
+          path: 'path-browserify',
+          fs: false,
+          net: false,
+          tls: false,
+        })
+      },
 
       vitePlugins: [
         [
-          'vite-plugin-checker',
+          'vite-plugin-filter-replace',
           {
-            eslint: {
-              lintCommand: 'eslint -c ./eslint.config.js "./src*/**/*.{js,mjs,cjs,vue}"',
-              useFlatConfig: true,
+            filter: /@bitauth\/libauth/,
+            replace: {
+              from: /^\/\/# sourceMappingURL=.*$/gm,
+              to: '',
             },
           },
-          { server: false },
         ],
+        // Custom plugin to handle require() calls
+        {
+          name: 'require-polyfill',
+          transform(code, id) {
+            // Skip node_modules processing to avoid infinite loops
+            if (id.includes('node_modules') && !id.includes('debug')) {
+              return null
+            }
+
+            // Add require polyfill at the top of files that need it
+            if (code.includes('require(') && !code.includes('function require(')) {
+              const polyfill = `
+if (typeof require === 'undefined') {
+  window.require = function(id) {
+    if (id === 'debug') {
+      return window.debug || function() {};
+    }
+    throw new Error('require() is not available in browser environment for: ' + id);
+  };
+}
+`
+              return polyfill + code
+            }
+            return null
+          },
+        },
       ],
     },
 
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#devserver
     devServer: {
-      // https: true,
       open: true, // opens browser window automatically
+      proxy: {
+        // Proxy API requests to your backend
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
+        // Proxy WebSocket connections for Django Channels
+        '/ws': {
+          target: 'ws://localhost:8000',
+          ws: true, // enable WebSocket proxying
+          changeOrigin: true,
+        },
+      },
     },
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
@@ -95,7 +242,7 @@ export default defineConfig((/* ctx */) => {
         'QAvatar',
         'QInput',
         'QFooter',
-        'QScrollArea'
+        'QScrollArea',
       ],
       // Quasar plugins
       plugins: ['Notify'],
@@ -109,8 +256,6 @@ export default defineConfig((/* ctx */) => {
       //
       // components: [],
       // directives: [],
-
-      
     },
 
     // animations: 'all', // --- includes all animations

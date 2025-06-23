@@ -1,0 +1,9 @@
+pragma cashscript ^0.11.0;
+
+// user wallet contract
+// This contract allows a user to deposit funds and see their current balance.
+contract UserWallet(string userName, bytes64 access) {
+    function transfer(string userCheck, bytes64 accessCheck) {
+        require(userCheck == userName && accessCheck == access);
+    }
+}

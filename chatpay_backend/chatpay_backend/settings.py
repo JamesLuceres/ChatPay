@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-pu941omgl7lk(%q_ryv&tkl**z^#t-deg7^xc_&&!)-#n=k_69
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'chat',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -73,8 +74,16 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'chatpay_backend.wsgi.application'
+ASGI_APPLICATION = "chatpay_backend.asgi.application"
 
+
+CHANNEL_LAYERS={
+    "default":{
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {   "hosts": [("127.0.0.1", 6379)],  
+                   },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -131,11 +140,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Allow only your Quasar dev server origin
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:9000",
+    "http://127.0.0.1:9000",
 ]
-
+CORS_ALLOW_CREDENTIALS = False
 # #using a custom user model
 # AUTH_USER_MODEL = 'chat.CustomUser'
-
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:9000$",
+    r"^http://127\.0\.0\.1:9000$",
+]
 # tells Django and DRF: “When anyone refers to a user, use this model.”
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (

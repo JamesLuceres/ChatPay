@@ -92,7 +92,7 @@
 
       <div class="text-center q-mt-lg">
         <span class="text-body2">
-          Don’t have an account?
+          Don't have an account?
           <a @click="goToRegister" class="signup-link">Sign up here</a>
         </span>
       </div>
@@ -122,7 +122,7 @@ const showPassword = ref(false)
 const loading = ref(false)
 const error = ref('')
 
-// 3) Reference to the <q-form> (for Quasar’s built-in validation)
+// 3) Reference to the <q-form> (for Quasar's built-in validation)
 const formRef = ref(null)
 
 function toggleShowPassword() {
@@ -130,51 +130,66 @@ function toggleShowPassword() {
 }
 
 async function onSubmit() {
-  // 4a) Run Quasar’s client-side rules
-  const isValid = await formRef.value.validate()
-  if (!isValid) {
-    return
-  }
-
-  // 4b) Clear any previous error and start loading
-  error.value = ''
-  loading.value = true
-
   try {
-    // 4c) POST to Django’s login endpoint.
-    // ← Note: Full URL or relative to your proxy config:
-    const resp = await axios.post('http://127.0.0.1:8000/api/login/', {
-      username: username.value,
-      password: password.value,
-    })
-
-    // 4d) On success: store the tokens under exactly "access_token" / "refresh_token"
-    const { access, refresh } = resp.data
-    localStorage.setItem('chatpay_access_token', access)
-    localStorage.setItem('chatpay_refresh_token', refresh)
-    // 4e) Redirect to /home. Because the guard now sees "access_token", it will allow you through.
-    await router.push('/home')
-
-    // 4f) Show a toast (optional, after routing)
-    Notify.create({
-      type: 'positive',
-      message: `Welcome back, ${username.value}!`,
-    })
-  } catch (e) {
-    // 5) Login failed: stop loading and display message
-    loading.value = false
-
-    if (e.response) {
-      if (e.response.status === 401) {
-        error.value = 'Invalid username or password.'
-      } else if (e.response.data && e.response.data.detail) {
-        error.value = e.response.data.detail
-      } else {
-        error.value = 'Login failed. Please try again.'
-      }
-    } else {
-      error.value = 'Unable to connect. Check your network.'
+    // 4a) Run Quasar's client-side rules
+    const isValid = await formRef.value.validate()
+    if (!isValid) {
+      return
     }
+
+    // 4b) Clear any previous error and start loading
+    error.value = ''
+    loading.value = true
+
+    try {
+      // 4c) POST to Django's login endpoint.
+      const resp = await axios.post('http://127.0.0.1:8000/api/login/', {
+        username: username.value,
+        password: password.value,
+      })
+
+      // 4d) On success: store the tokens
+      const { access, refresh } = resp.data
+      localStorage.setItem('access', access)
+      localStorage.setItem('refresh', refresh)
+
+      // 4e) Redirect to /home with proper error handling
+      try {
+        await router.push('/home')
+
+        // 4f) Show a toast after successful navigation
+        Notify.create({
+          type: 'positive',
+          message: `Welcome back, ${username.value}!`,
+        })
+      } catch (navigationError) {
+        console.error('Navigation error:', navigationError)
+        // Still show success message even if navigation has issues
+        Notify.create({
+          type: 'positive',
+          message: `Login successful! ${username.value}`,
+        })
+      }
+    } catch (loginError) {
+      // 5) Login failed: stop loading and display message
+      if (loginError.response) {
+        if (loginError.response.status === 401) {
+          error.value = 'Invalid username or password.'
+        } else if (loginError.response.data && loginError.response.data.detail) {
+          error.value = loginError.response.data.detail
+        } else {
+          error.value = 'Login failed. Please try again.'
+        }
+      } else {
+        error.value = 'Unable to connect. Check your network.'
+      }
+    }
+  } catch (unexpectedError) {
+    console.error('Unexpected error in onSubmit:', unexpectedError)
+    error.value = 'An unexpected error occurred. Please try again.'
+  } finally {
+    // Always stop loading
+    loading.value = false
   }
 }
 

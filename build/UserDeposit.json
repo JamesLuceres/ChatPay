@@ -1,0 +1,87 @@
+{
+  "contractName": "UserDeposit",
+  "constructorInputs": [
+    {
+      "name": "userPubKeyHash",
+      "type": "bytes20"
+    }
+  ],
+  "abi": [
+    {
+      "name": "withdraw",
+      "inputs": [
+        {
+          "name": "userSig",
+          "type": "sig"
+        },
+        {
+          "name": "userPubKey",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "deductFee",
+      "inputs": [
+        {
+          "name": "userSig",
+          "type": "sig"
+        },
+        {
+          "name": "feeAmount",
+          "type": "int"
+        },
+        {
+          "name": "chatRoomScript",
+          "type": "bytes"
+        },
+        {
+          "name": "userPubKey",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "bytecode": "OP_OVER OP_0 OP_NUMEQUAL OP_IF OP_ROT OP_3 OP_PICK OP_CHECKSIGVERIFY OP_ROT OP_HASH160 OP_EQUAL OP_NIP OP_ELSE OP_SWAP OP_1 OP_NUMEQUALVERIFY OP_SWAP OP_4 OP_PICK OP_CHECKSIGVERIFY OP_3 OP_ROLL OP_HASH160 OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_NUMEQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_EQUALVERIFY OP_1 OP_OUTPUTBYTECODE OP_ACTIVEBYTECODE OP_EQUAL OP_ENDIF",
+  "source": "// SPDX-License-Identifier: MIT\r\npragma cashscript ^0.10.0;\r\n\r\ncontract UserDeposit(bytes20 userPubKeyHash) {\r\n    /**\r\n     * @notice Withdraw _all_ funds back to the user’s wallet.\r\n     * @param userSig     Signature by the user.\r\n     * @param userPubKey  The user’s pubkey (must hash to the saved pubKeyHash).\r\n     */\r\n    function withdraw(sig userSig, pubkey userPubKey) {\r\n        require(checkSig(userSig, userPubKey));\r\n        require(hash160(userPubKey) == userPubKeyHash);\r\n    }\r\n\r\n    /**\r\n     * @notice Deduct a per-message fee.\r\n     * @param userSig        Signature by the user.\r\n     * @param feeAmount      Fee in satoshis to send to the chat room.\r\n     * @param chatRoomScript The chat room’s locking bytecode.\r\n     * @param userPubKey     The user’s pubkey (must hash to saved hash).\r\n     */\r\n    function deductFee(\r\n        sig userSig,\r\n        int feeAmount,\r\n        bytes chatRoomScript,\r\n        pubkey userPubKey\r\n    ) {\r\n        // 1) Auth\r\n        require(checkSig(userSig, userPubKey));\r\n        require(hash160(userPubKey) == userPubKeyHash);\r\n\r\n        // 2) First output is exactly the fee to the ChatRoom\r\n        require(tx.outputs[0].value == feeAmount);\r\n        require(tx.outputs[0].lockingBytecode == chatRoomScript);\r\n\r\n        // 3) Second output must re‐lock the remainder back to _this_ contract\r\n        require(tx.outputs[1].lockingBytecode == this.activeBytecode);\r\n    }\r\n}\r\n",
+  "debug": {
+    "bytecode": "5179009c63527a5379ac69527aa9517a877767517a519c69517a5479ac69537aa9517a876900cc517a9c6900cd517a876951cdc18768",
+    "sourceMap": "10:4:13:5;;;;;11:25:11:32;;:34::44;;:16::45:1;:8::47;12:24:12:34:0;;:16::35:1;:39::53:0;;:16:::1;10:4:13:5;;22::38::0;;;;;29:25:29:32;;:34::44;;:16::45:1;:8::47;30:24:30:34:0;;:16::35:1;:39::53:0;;:16:::1;:8::55;33:27:33:28:0;:16::35:1;:39::48:0;;:16:::1;:8::50;34:27:34:28:0;:16::45:1;:49::63:0;;:16:::1;:8::65;37:27:37:28:0;:16::45:1;:49::68:0;:16:::1;4:0:39:1",
+    "logs": [],
+    "requires": [
+      {
+        "ip": 11,
+        "line": 11
+      },
+      {
+        "ip": 18,
+        "line": 12
+      },
+      {
+        "ip": 30,
+        "line": 29
+      },
+      {
+        "ip": 37,
+        "line": 30
+      },
+      {
+        "ip": 43,
+        "line": 33
+      },
+      {
+        "ip": 49,
+        "line": 34
+      },
+      {
+        "ip": 54,
+        "line": 37
+      }
+    ]
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.10.5"
+  },
+  "updatedAt": "2025-06-16T06:23:18.354Z"
+}

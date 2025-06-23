@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "vite-plugin-filter-replace": "^0.1.14"
+  },
+  "dependencies": {
+    "events": "^3.3.0"
+  }
+}

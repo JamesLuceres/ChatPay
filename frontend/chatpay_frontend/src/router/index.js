@@ -7,30 +7,40 @@ const routes = [
   {
     path: '/home',
     component: () => import('pages/HomePage.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/rooms/create',
-    component: () => import('pages/CreateRoom.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
   {
     path: '/rooms/:id',
     component: () => import('pages/RoomPage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
-  { path: '/:catchAll(.*)*', component: () => import('pages/PageNotFound.vue') }
+  {
+    path: '/profile',
+    component: () => import('pages/ProfilePage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/settings',
+    component: () => import('pages/SettingsPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/deposit',
+    component: () => import('pages/DepositPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  { path: '/:catchAll(.*)*', component: () => import('pages/PageNotFound.vue') },
 ]
 
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
-  routes
+  routes,
 })
 
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth) {
-    // Notice we check for 'chatpay_access_token' (same key LoginPage.vue used)
-    const token = localStorage.getItem('chatpay_access_token')
+    // Notice we check for 'access' (same key LoginPage.vue used)
+    const token = localStorage.getItem('access')
     if (!token) {
       return next('/login')
     }

@@ -18,7 +18,9 @@ class CustomUser(models.Model):
         related_name='profile'
     )
     bch_address   = models.CharField(max_length=100, blank=True, null=True)
+    bch_pubkey    = models.CharField(max_length=100, blank=True, null=True)
     token_address = models.CharField(max_length=100, blank=True, null=True)
+    avatar        = models.ImageField(upload_to='avatars/', blank=True, null=True)
     date_joined   = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
@@ -31,15 +33,22 @@ class Room(models.Model):
     """
     name = models.CharField(max_length=100, unique=True)
     participants = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        related_name='rooms',
-        blank=True
+       settings.AUTH_USER_MODEL,
+       related_name='rooms',
+       blank=True
     )
     created_at = models.DateTimeField(default=timezone.now)
 
+   # ─── track who created the room ────────────────────────────────────
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='rooms_created',
+        null=True,                 # allow null on existing rows
+        on_delete=models.SET_NULL  # don't delete rooms if user is removed
+    )
     def __str__(self):
         return self.name
-
+    
 
 class Message(models.Model):
     """

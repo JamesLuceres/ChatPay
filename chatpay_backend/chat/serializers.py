@@ -1,9 +1,10 @@
 # chat/serializers.py
 
 from rest_framework import serializers
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from .models import CustomUser, Room, Message, RoomInvite
+User = get_user_model()
 
 # --- Registration Serializer ---
 class RegisterSerializers(serializers.Serializer):
@@ -51,18 +52,26 @@ class RegisterSerializers(serializers.Serializer):
             "date_joined":   user.date_joined
         }
 
+# ─── add this helper for nesting the user ─────────────────────────────────────
+class UserPreviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("id", "username")
 
-# --- Chat Room & Message Serializers ---
+
+# ─── update your MessageSerializer to use it ─────────────────────────────────
 class MessageSerializer(serializers.ModelSerializer):
-    sender = serializers.CharField(source='sender.username', read_only=True)
+    sender = UserPreviewSerializer(read_only=True)
 
     class Meta:
         model = Message
-        fields = ['id', 'room', 'sender', 'content', 'timestamp']
-        read_only_fields = ['id', 'sender', 'timestamp']
+        fields = ["id", "sender", "content", "timestamp"]
+        read_only_fields = ["id", "sender", "timestamp", "room"]
 
 
+# ─── Room and RoomInvite Serializers ────────────────────────────────────────
 class RoomSerializer(serializers.ModelSerializer):
+    created_by   = UserPreviewSerializer(read_only=True)
     participants = serializers.SlugRelatedField(
         many=True,
         slug_field='username',
@@ -72,7 +81,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ['id', 'name', 'participants', 'created_at', 'last_message']
+        fields = ['id', 'name', 'created_by', 'participants', 'created_at', 'last_message']
         read_only_fields = ['id', 'created_at', 'last_message']
 
     def get_last_message(self, obj):
@@ -100,3 +109,69 @@ class JoinRoomSerializer(serializers.Serializer):
         if not invite.is_valid():
             raise serializers.ValidationError("This invite is expired or has reached its usage limit.")
         return value
+    
+class RoomCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = ['id', 'name'
+        ]
+        read_only_fields=['id']
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    bch_address   = serializers.CharField(
+        source='profile.bch_address',
+        allow_blank=True,
+        required=False
+    )
+    token_address = serializers.CharField(
+        source='profile.token_address',
+        allow_blank=True,
+        required=False
+    )
+    avatar_url    = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = User
+        fields = [
+            'id', 'username', 'email',
+            'bch_address', 'token_address', 'avatar_url'
+        ]
+        read_only_fields = ['id', 'email', 'avatar_url']
+
+    def get_avatar_url(self, user):
+        # safely handle missing profile or missing avatar
+        prof = getattr(user, 'profile', None)
+        if prof and hasattr(prof, 'avatar') and prof.avatar:
+            return prof.avatar.url
+        return None
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password     = serializers.CharField(
+        write_only=True,
+        validators=[validate_password]
+    )
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate_current_password(self, value):
+        user = self.context['user']
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError("New passwords do not match.")
+        return data
+
+    def save(self, **kwargs):
+        user = self.context['user']
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        return user
+
+
+class AvatarSerializer(serializers.Serializer):
+    avatar = serializers.ImageField()
