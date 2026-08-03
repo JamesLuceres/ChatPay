@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "@psf/bitcoincashjs-lib": "^4.0.3",
-    "cashscript": "^0.10.5"
+    "body-parser": "^2.2.0",
+    "cashscript": "^0.10.5",
+    "express": "^5.1.0"
   }
 }

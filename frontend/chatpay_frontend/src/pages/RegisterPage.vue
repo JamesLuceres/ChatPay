@@ -145,30 +145,16 @@
         </div>
       </q-form>
 
-      <!-- “or sign in with” -->
+      <!-- "or sign in with" -->
       <div class="text-center q-mt-lg q-mb-sm">
         <span class="text-body2">or sign in with</span>
       </div>
       <div class="row justify-center q-gutter-sm">
-        <q-btn
-          flat
-          round
-          dense
-          icon="mdi-google"
-          class="social-btn"
-          @click="onSocialClick('google')"
-        />
-        <q-btn
-          flat
-          round
-          dense
-          icon="mdi-facebook"
-          class="social-btn"
-          @click="onSocialClick('facebook')"
-        />
+        <q-btn flat round dense icon="mdi-google" class="social-btn" @click="onSocialClick()" />
+        <q-btn flat round dense icon="mdi-facebook" class="social-btn" @click="onSocialClick()" />
       </div>
 
-      <!-- “Already have an account?” -->
+      <!-- "Already have an account?" -->
       <div class="text-center q-mt-lg">
         <span class="text-body2">
           Already have an account?
@@ -177,7 +163,7 @@
       </div>
     </div>
 
-    <!-- Bottom “Powered by” + Paytaca logo -->
+    <!-- Bottom "Powered by" + Paytaca logo -->
     <div class="powered-container">
       <span class="text-body2">Powered by:</span>
       <img src="~assets/logo/paytaca-logo.png" alt="Paytaca Logo" class="paytaca-logo" />
@@ -217,11 +203,11 @@ const errors = ref({
   general: '',
 })
 
-// Reference to Quasar’s <q-form> for client‐side validation
+// Reference to Quasar's <q-form> for client-side validation
 const formRef = ref(null)
 
 async function onSubmit() {
-  // 1) Run built‐in Quasar validation
+  // 1) Run built-in Quasar validation
   const valid = await formRef.value.validate()
   if (!valid) {
     return
@@ -238,14 +224,12 @@ async function onSubmit() {
   loading.value = true
 
   try {
-    const response = await axios.post('/api/register/', {
+    await axios.post('/api/register/', {
       username: username.value,
       email: email.value,
       password: password.value,
       confirm_password: confirmPassword.value,
     })
-
-    console.log('✅ onSubmit(): 201 received, success!', response)
 
     // 3) Clear errors again just to be safe:
     Object.assign(errors.value, {
@@ -265,19 +249,18 @@ async function onSubmit() {
     // 5) Redirect to /login
     await router.push('/login')
   } catch (err) {
-    console.error('❌ Registration error:', err)
     loading.value = false
 
     if (err.response && err.response.data) {
       const data = err.response.data
 
-      // Field‐level errors:
+      // Field-level errors:
       errors.value.username = data.username ? data.username.join(' ') : ''
       errors.value.email = data.email ? data.email.join(' ') : ''
       errors.value.password = data.password ? data.password.join(' ') : ''
       errors.value.confirm_password = data.confirm_password ? data.confirm_password.join(' ') : ''
 
-      // Non‐field (general) errors:
+      // Non-field (general) errors:
       if (data.detail) {
         errors.value.general = data.detail
       } else if (data.non_field_errors) {
@@ -296,8 +279,8 @@ function goToLogin() {
   router.push('/login')
 }
 
-function onSocialClick(provider) {
-  console.log(`Register with ${provider} clicked`)
+function onSocialClick() {
+  // No need to log the click, as it's a user action
 }
 </script>
 <style scoped>
@@ -380,7 +363,7 @@ function onSocialClick(provider) {
   mix-blend-mode: multiply;
 }
 
-/* “Sign in” link styling */
+/* "Sign in" link styling */
 .signup-link {
   color: #1976d2;
   cursor: pointer;

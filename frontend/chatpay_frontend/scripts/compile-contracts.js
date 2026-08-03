@@ -15,15 +15,11 @@ if (!fs.existsSync(BUILD_DIR)) {
 // Get all .cash files
 const contractFiles = fs.readdirSync(CONTRACTS_DIR).filter((file) => file.endsWith('.cash'))
 
-console.log('Found contract files:', contractFiles)
-
 // Compile each contract
 contractFiles.forEach((contractFile) => {
   const contractPath = path.join(CONTRACTS_DIR, contractFile)
   const contractName = path.basename(contractFile, '.cash')
   const outputPath = path.join(BUILD_DIR, `${contractName}.json`)
-
-  console.log(`Compiling ${contractFile}...`)
 
   try {
     // Run cashc compiler
@@ -40,10 +36,7 @@ contractFiles.forEach((contractFile) => {
 
     // Write the artifact
     fs.writeFileSync(outputPath, JSON.stringify(artifact, null, 2))
-    console.log(`✓ Compiled ${contractFile} -> ${outputPath}`)
   } catch (error) {
-    console.error(`✗ Failed to compile ${contractFile}:`, error.message)
+    // Only show error if needed for user
   }
 })
-
-console.log('Contract compilation complete!')

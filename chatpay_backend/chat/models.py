@@ -10,15 +10,13 @@ from django.utils import timezone
 class CustomUser(models.Model):
     """
     Profile extension for the built-in User.
-    Stores BCH‐specific fields and join date.
+    Stores join date, avatar, and token address.
     """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='profile'
     )
-    bch_address   = models.CharField(max_length=100, blank=True, null=True)
-    bch_pubkey    = models.CharField(max_length=100, blank=True, null=True)
     token_address = models.CharField(max_length=100, blank=True, null=True)
     avatar        = models.ImageField(upload_to='avatars/', blank=True, null=True)
     date_joined   = models.DateTimeField(default=timezone.now)
@@ -31,13 +29,19 @@ class Room(models.Model):
     """
     A chat room that many users can join.
     """
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
     name = models.CharField(max_length=100, unique=True)
     participants = models.ManyToManyField(
        settings.AUTH_USER_MODEL,
        related_name='rooms',
        blank=True
     )
+    max_participants = models.PositiveIntegerField(
+        default=0,
+        help_text="Maximum number of users allowed in this room(0 = unlimited)"
+    )
     created_at = models.DateTimeField(default=timezone.now)
+    contract_address = models.CharField(max_length=100, blank=True, null=True)  # BCH contract address for the room
 
    # ─── track who created the room ────────────────────────────────────
     created_by = models.ForeignKey(
@@ -46,6 +50,22 @@ class Room(models.Model):
         null=True,                 # allow null on existing rows
         on_delete=models.SET_NULL  # don't delete rooms if user is removed
     )
+    
+    # Minimum balance required to join this room (in BCH)
+    min_balance_required = models.DecimalField(
+        max_digits=10,
+        decimal_places=8,
+        default=0.00018,  # Default minimum balance (0.00018 BCH)
+        help_text="Minimum BCH balance required to join this room"
+    )
+    # Per-message BCH fee required to send messages in this room
+    message_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=8,
+        default=0.000018,  # Default message fee (0.000018 BCH)
+        help_text="BCH fee required to send a message in this room"
+    )
+    
     def __str__(self):
         return self.name
     

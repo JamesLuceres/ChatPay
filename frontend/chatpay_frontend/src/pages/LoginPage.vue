@@ -72,22 +72,8 @@
         <span class="text-body2">or sign in with</span>
       </div>
       <div class="row justify-center q-gutter-sm">
-        <q-btn
-          flat
-          round
-          dense
-          icon="mdi-google"
-          class="social-btn"
-          @click="onSocialClick('google')"
-        />
-        <q-btn
-          flat
-          round
-          dense
-          icon="mdi-facebook"
-          class="social-btn"
-          @click="onSocialClick('facebook')"
-        />
+        <q-btn flat round dense icon="mdi-google" class="social-btn" @click="onSocialClick()" />
+        <q-btn flat round dense icon="mdi-facebook" class="social-btn" @click="onSocialClick()" />
       </div>
 
       <div class="text-center q-mt-lg">
@@ -162,8 +148,7 @@ async function onSubmit() {
           type: 'positive',
           message: `Welcome back, ${username.value}!`,
         })
-      } catch (navigationError) {
-        console.error('Navigation error:', navigationError)
+      } catch {
         // Still show success message even if navigation has issues
         Notify.create({
           type: 'positive',
@@ -184,8 +169,7 @@ async function onSubmit() {
         error.value = 'Unable to connect. Check your network.'
       }
     }
-  } catch (unexpectedError) {
-    console.error('Unexpected error in onSubmit:', unexpectedError)
+  } catch {
     error.value = 'An unexpected error occurred. Please try again.'
   } finally {
     // Always stop loading
@@ -197,8 +181,8 @@ async function onSubmit() {
 function goToRegister() {
   router.push('/register')
 }
-function onSocialClick(provider) {
-  console.log(`Sign in with ${provider} clicked`)
+function onSocialClick() {
+  // No need to log this as it's not user-facing
 }
 </script>
 

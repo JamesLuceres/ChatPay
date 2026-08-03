@@ -1,21 +1,21 @@
 // Configuration for your app
-// https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
+// https://v2.quasar.dev/quasar-cli-webpack/quasar-config-file
 
-import { defineConfig } from '#q-app/wrappers'
-import { Notify } from 'quasar'
+import { configure } from 'quasar/wrappers'
 import path from 'path'
+import webpack from 'webpack'
 
-export default defineConfig((/* ctx */) => {
+export default configure(function (/* ctx */) {
   return {
-    // https://v2.quasar.dev/quasar-cli-vite/prefetch-feature
+    // https://v2.quasar.dev/quasar-cli-webpack/prefetch-feature
     // preFetch: true,
 
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
-    // https://v2.quasar.dev/quasar-cli-vite/boot-files
-    boot: ['axios', 'buffer'],
+    // https://v2.quasar.dev/quasar-cli-webpack/boot-files
+    boot: ['axios'],
 
-    // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
+    // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-file#css
     css: ['app.scss'],
 
     // https://github.com/quasarframework/quasar/tree/dev/extras
@@ -32,14 +32,20 @@ export default defineConfig((/* ctx */) => {
       'material-icons', // optional, you are not bound to it
     ],
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#build
-    build: {
-      target: {
-        browser: ['es2022', 'firefox115', 'chrome115', 'safari15'],
-        node: 'es2022',
-      },
+    eslint: {
+      // fix: true,
+      // include: [],
+      // exclude: [],
+      // cache: false,
+      // rawEsbuildEslintOptions: {},
+      // rawWebpackEslintPluginOptions: {},
+      warnings: true,
+      errors: true,
+    },
 
-      vueRouterMode: 'hash', // available values: 'hash', 'history'
+    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/quasar-config-file#build
+    build: {
+      vueRouterMode: 'history', // available values: 'hash', 'history'
       // vueRouterBase,
       // vueDevtools,
       // vueOptionsAPI: false,
@@ -55,176 +61,90 @@ export default defineConfig((/* ctx */) => {
       // polyfillModulePreload: true,
       // distDir
 
-      extendViteConf(viteConf) {
-        // Ensure esbuild config exists before modifying
-        if (!viteConf.esbuild) {
-          viteConf.esbuild = {}
-        }
-        viteConf.esbuild.supported = {
-          'top-level-await': true,
-        }
+      esbuildTarget: {
+        browser: ['es2022', 'firefox115', 'chrome115', 'safari14'],
+        node: 'node20',
+      },
 
-        // Ensure optimizeDeps config exists
-        if (!viteConf.optimizeDeps) {
-          viteConf.optimizeDeps = {}
-        }
+      // webpackTranspile
+      // webpackTranspileDependencies
+      // webpackDevtool
 
-        // Exclude problematic dependencies from Vite's optimizer
-        const exclude = [
-          'cashscript',
-          '@psf/bitcoincashjs-lib',
-          '@psf/bch-js', // Add this too
-          '@bitauth/libauth',
-          'electrum-cash',
-          'debug', // Keep debug in exclude for now
-          // 'isomorphic-ws',
-        ]
-        viteConf.optimizeDeps.exclude = [
-          ...(viteConf.optimizeDeps.exclude || []).filter((dep) => dep !== '@psf/bch-js'),
-        ]
+      // htmlFilename
+      // rtl
+      // showProgress
+      // gzip
+      // vueCompiler
 
-        // Include dependencies that need to be pre-bundled
-        const include = [
-          // 'debug', // Remove debug from include since it's causing issues
-          'isomorphic-ws',
-        ]
-        viteConf.optimizeDeps.include = [...(viteConf.optimizeDeps.include || []), '@psf/bch-js']
-
-        // Add alias to fix module import issues
-        if (!viteConf.resolve) {
-          viteConf.resolve = {}
-        }
-        if (!viteConf.resolve.alias) {
-          viteConf.resolve.alias = {}
-        }
-
-        // Fix various module aliases
-        viteConf.resolve.alias.delay = 'delay/index.js'
-        viteConf.resolve.alias['fast-deep-equal'] = 'fast-deep-equal/index.js'
-        viteConf.resolve.alias['events'] = 'events'
-
-        // Fix debug module import issue
-        viteConf.resolve.alias['debug'] = 'debug/src/browser.js'
-
-        // 1) Alias the browser build → the CJS entry
-        viteConf.resolve.alias['isomorphic-ws/browser.js'] = path.resolve(
-          __dirname,
-          'node_modules/isomorphic-ws/index.js',
-        )
-
-        // Configure CommonJS options
-        viteConf.build = viteConf.build || {}
-        viteConf.build.commonjsOptions = {
-          ...(viteConf.build.commonjsOptions || {}),
-          defaultIsModuleExports: ['isomorphic-ws', 'debug'],
-          transformMixedEsModules: true, // This helps with mixed module types
-        }
-
-        // Add define to handle Node.js globals in browser
-        viteConf.define = {
-          ...(viteConf.define || {}),
-          global: 'globalThis',
-          'process.env.NODE_DEBUG': JSON.stringify(''),
-          'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-          'process.browser': true,
-          'process.version': JSON.stringify(''),
-          'process.versions': JSON.stringify({}),
-        }
-
+      extendWebpack(cfg) {
         // Add Node.js polyfills
-        if (!viteConf.resolve.alias) {
-          viteConf.resolve.alias = {}
-        }
 
-        // Add more comprehensive polyfills
-        Object.assign(viteConf.resolve.alias, {
-          // Existing aliases
-          delay: 'delay/index.js',
-          'fast-deep-equal': 'fast-deep-equal/index.js',
-          events: 'events',
-          debug: 'debug/src/browser.js',
-          'isomorphic-ws/browser.js': path.resolve(
-            __dirname,
-            'node_modules/isomorphic-ws/index.js',
-          ),
-
-          // Add Node.js polyfills
-          util: 'util',
+        cfg.resolve.fallback = {
+          ...cfg.resolve.fallback,
           stream: path.resolve(__dirname, 'node_modules/stream-browserify'),
-          buffer: 'buffer',
           crypto: path.resolve(__dirname, 'node_modules/crypto-browserify'),
-          assert: path.resolve(__dirname, 'node_modules/assert/'),
-          http: 'stream-http',
-          https: 'https-browserify',
-          os: 'os-browserify/browser',
-          url: 'url',
-          querystring: 'querystring-es3',
-          path: 'path-browserify',
+          buffer: path.resolve(__dirname, 'node_modules/buffer'),
+          util: path.resolve(__dirname, 'node_modules/util'),
+          assert: path.resolve(__dirname, 'node_modules/assert'),
+          http: path.resolve(__dirname, 'node_modules/stream-http'),
+          https: path.resolve(__dirname, 'node_modules/https-browserify'),
+          os: path.resolve(__dirname, 'node_modules/os-browserify/browser'),
+          url: path.resolve(__dirname, 'node_modules/url'),
+          querystring: path.resolve(__dirname, 'node_modules/querystring-es3'),
+          path: path.resolve(__dirname, 'node_modules/path-browserify'),
           fs: false,
           net: false,
           tls: false,
-        })
+          vm: false, // or: require.resolve('vm-browserify')
+        }
+
+        cfg.resolve = cfg.resolve || {}
+        cfg.resolve.alias = {
+          ...(cfg.resolve.alias || {}),
+          'process/browser': path.resolve(__dirname, 'node_modules/process/browser'),
+        }
+
+        // Add Buffer to global scope
+        cfg.plugins.push(
+          new webpack.ProvidePlugin({
+            Buffer: ['buffer', 'Buffer'],
+            process: 'process/browser',
+          }),
+        )
       },
 
-      vitePlugins: [
-        [
-          'vite-plugin-filter-replace',
-          {
-            filter: /@bitauth\/libauth/,
-            replace: {
-              from: /^\/\/# sourceMappingURL=.*$/gm,
-              to: '',
-            },
-          },
-        ],
-        // Custom plugin to handle require() calls
-        {
-          name: 'require-polyfill',
-          transform(code, id) {
-            // Skip node_modules processing to avoid infinite loops
-            if (id.includes('node_modules') && !id.includes('debug')) {
-              return null
-            }
+      // uglifyOptions
+      // scssLoaderOptions
+      // sassLoaderOptions
+      // stylusLoaderOptions
+      // lessLoaderOptions
+      // vueLoaderOptions
+      // tsLoaderOptions
+    },
 
-            // Add require polyfill at the top of files that need it
-            if (code.includes('require(') && !code.includes('function require(')) {
-              const polyfill = `
-if (typeof require === 'undefined') {
-  window.require = function(id) {
-    if (id === 'debug') {
-      return window.debug || function() {};
-    }
-    throw new Error('require() is not available in browser environment for: ' + id);
-  };
-}
-`
-              return polyfill + code
-            }
-            return null
-          },
+    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/quasar-config-file#devserver
+    devServer: {
+      server: {
+        type: 'http',
+      },
+      // https: true
+      open: true, // opens browser window automatically
+      proxy: [
+        {
+          context: ['/api'],
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
+        {
+          context: ['/ws/rooms'],
+          target: 'http://localhost:8000',
+          ws: true, // enable WebSocket proxying
+          changeOrigin: true,
         },
       ],
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#devserver
-    devServer: {
-      open: true, // opens browser window automatically
-      proxy: {
-        // Proxy API requests to your backend
-        '/api': {
-          target: 'http://localhost:8000',
-          changeOrigin: true,
-        },
-        // Proxy WebSocket connections for Django Channels
-        '/ws': {
-          target: 'ws://localhost:8000',
-          ws: true, // enable WebSocket proxying
-          changeOrigin: true,
-        },
-      },
-    },
-
-    // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
+    // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-file#framework
     framework: {
       config: [
         'QLayout',
@@ -245,7 +165,7 @@ if (typeof require === 'undefined') {
         'QScrollArea',
       ],
       // Quasar plugins
-      plugins: ['Notify'],
+      plugins: ['Notify', 'Dark'],
 
       // iconSet: 'material-icons', // Quasar icon set
       // lang: 'en-US', // Quasar language pack
@@ -262,20 +182,12 @@ if (typeof require === 'undefined') {
     // https://v2.quasar.dev/options/animations
     animations: [],
 
-    // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#sourcefiles
-    // sourceFiles: {
-    //   rootComponent: 'src/App.vue',
-    //   router: 'src/router/index',
-    //   store: 'src/store/index',
-    //   pwaRegisterServiceWorker: 'src-pwa/register-service-worker',
-    //   pwaServiceWorker: 'src-pwa/custom-service-worker',
-    //   pwaManifestFile: 'src-pwa/manifest.json',
-    //   electronMain: 'src-electron/electron-main',
-    //   electronPreload: 'src-electron/electron-preload'
-    //   bexManifestFile: 'src-bex/manifest.json
-    // },
+    // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-file#sourcefiles
+    sourceFiles: {
+      indexHtmlTemplate: 'index.html',
+    },
 
-    // https://v2.quasar.dev/quasar-cli-vite/developing-ssr/configuring-ssr
+    // https://v2.quasar.dev/quasar-cli-webpack/developing-ssr/configuring-ssr
     ssr: {
       prodPort: 3000, // The default port that the production server should use
       // (gets superseded if process.env.PORT is specified at runtime)
@@ -299,7 +211,7 @@ if (typeof require === 'undefined') {
       // pwaExtendInjectManifestOptions (cfg) {}
     },
 
-    // https://v2.quasar.dev/quasar-cli-vite/developing-pwa/configuring-pwa
+    // https://v2.quasar.dev/quasar-cli-webpack/developing-pwa/configuring-pwa
     pwa: {
       workboxMode: 'GenerateSW', // 'GenerateSW' or 'InjectManifest'
       // swFilename: 'sw.js',
@@ -312,17 +224,17 @@ if (typeof require === 'undefined') {
       // extendInjectManifestOptions (cfg) {}
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-cordova-apps/configuring-cordova
+    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/developing-cordova-apps/configuring-cordova
     cordova: {
       // noIosLegacyBuildFlag: true, // uncomment only if you know what you are doing
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-capacitor-apps/configuring-capacitor
+    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/developing-capacitor-apps/configuring-capacitor
     capacitor: {
       hideSplashscreen: true,
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-electron-apps/configuring-electron
+    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/developing-electron-apps/configuring-electron
     electron: {
       // extendElectronMainConf (esbuildConf) {},
       // extendElectronPreloadConf (esbuildConf) {},
@@ -355,7 +267,7 @@ if (typeof require === 'undefined') {
       },
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-browser-extensions/configuring-bex
+    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/developing-browser-extensions/configuring-bex
     bex: {
       // extendBexScriptsConf (esbuildConf) {},
       // extendBexManifestJson (json) {},

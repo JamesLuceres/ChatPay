@@ -8,8 +8,8 @@ User = get_user_model()
 
 @admin.register(CustomUser)
 class CustomUserAdmin(admin.ModelAdmin):
-    list_display   = ("user", "bch_address", "token_address", "date_joined")
-    search_fields  = ("user__username", "bch_address", "token_address")
+    list_display   = ("user", "token_address", "date_joined")
+    search_fields  = ("user__username", "token_address")
 
 
 @admin.register(Room)
@@ -36,7 +36,7 @@ class RoomInviteAdmin(admin.ModelAdmin):
     list_filter  = ('room', 'created_by', 'uses', 'max_uses', 'expires_at')
     search_fields = ('code', 'room__name', 'created_by__username')
 
-    # show a “used” boolean in list_display
+    # show a "used" boolean in list_display
     def used(self, obj):
         return not obj.is_valid()
     used.boolean = True

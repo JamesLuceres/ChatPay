@@ -30,22 +30,39 @@
             @change="onAvatarSelected"
           />
         </div>
-        <div class="text-h6 q-mt-sm">{{ profile.username }}</div>
-        <div class="text-caption text-grey-6">{{ profile.email }}</div>
       </div>
 
       <!-- Profile Form -->
       <q-form @submit.prevent="saveProfile" class="q-px-md q-gutter-md">
-        <q-input
-          v-model="profile.username"
-          label="Username"
-          outlined
-          :rules="[(v) => !!v || 'Username is required']"
-        />
+        <div class="q-mt-md">
+          <div class="text-caption text-grey-7">Username</div>
+          <div
+            class="text-body2 bg-grey-2 q-pa-sm q-mt-xs"
+            style="border-radius: 4px; word-break: break-all"
+          >
+            {{ profile.username }}
+          </div>
+        </div>
 
-        <q-input v-model="profile.bch_address" label="BCH Address" outlined />
+        <div class="q-mt-md">
+          <div class="text-caption text-grey-7">Email</div>
+          <div
+            class="text-body2 bg-grey-2 q-pa-sm q-mt-xs"
+            style="border-radius: 4px; word-break: break-all"
+          >
+            {{ profile.email }}
+          </div>
+        </div>
 
-        <q-input v-model="profile.token_address" label="Token Address" outlined />
+        <div class="q-mt-md">
+          <div class="text-caption text-grey-7">Password</div>
+          <div
+            class="text-body2 bg-grey-2 q-pa-sm q-mt-xs"
+            style="border-radius: 4px; width: 120px"
+          >
+            ********
+          </div>
+        </div>
 
         <div class="row q-mt-lg q-mb-lg">
           <q-btn
@@ -173,8 +190,6 @@ const profile = ref({
   id: null,
   username: '',
   email: '',
-  bch_address: '',
-  token_address: '',
   avatar_url: '',
 })
 const saving = ref(false)
@@ -213,15 +228,7 @@ async function saveProfile() {
   saving.value = true
   try {
     const token = localStorage.getItem('access')
-    await axios.patch(
-      '/api/profile/',
-      {
-        username: profile.value.username,
-        bch_address: profile.value.bch_address,
-        token_address: profile.value.token_address,
-      },
-      { headers: { Authorization: `Bearer ${token}` } },
-    )
+    await axios.patch('/api/profile/', {}, { headers: { Authorization: `Bearer ${token}` } })
     Notify.create({ type: 'positive', message: 'Profile updated.' })
   } catch {
     Notify.create({ type: 'negative', message: 'Failed to update profile.' })

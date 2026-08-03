@@ -1,0 +1,70 @@
+{
+  "contractName": "RoomCreate",
+  "constructorInputs": [
+    {
+      "name": "roomIdBytes",
+      "type": "bytes"
+    },
+    {
+      "name": "payeeLockingBytecode",
+      "type": "bytes"
+    },
+    {
+      "name": "adminLockingHash256",
+      "type": "bytes32"
+    }
+  ],
+  "abi": [
+    {
+      "name": "pay",
+      "inputs": [
+        {
+          "name": "roomIdCheck",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "inputs": []
+    }
+  ],
+  "bytecode": "OP_3 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_4 OP_ROLL OP_EQUALVERIFY OP_TXOUTPUTCOUNT OP_1 OP_GREATERTHANOREQUAL OP_VERIFY OP_0 OP_OUTPUTBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE 740e OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_ELSE OP_3 OP_ROLL OP_1 OP_NUMEQUALVERIFY OP_TXOUTPUTCOUNT OP_1 OP_NUMEQUALVERIFY aa20 OP_3 OP_ROLL OP_CAT 87 OP_CAT OP_0 OP_OUTPUTBYTECODE OP_EQUAL OP_NIP OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.10.0;\r\n\r\n// Room creation contract\r\ncontract RoomCreate(bytes roomIdBytes, bytes payeeLockingBytecode, bytes32 adminLockingHash256) {\r\n    function pay(bytes roomIdCheck) {\r\n        require(roomIdCheck == roomIdBytes);\r\n        require(tx.outputs.length >= 1);\r\n        require(tx.outputs[0].lockingBytecode == payeeLockingBytecode);\r\n        require(tx.outputs[0].value >= 3700); // Minimum 0.000037 BCH\r\n    }\r\n\r\n    function withdraw() {\r\n        // Only allow withdrawal if all funds go to the admin's UserWallet (P2SH32)\r\n        require(tx.outputs.length == 1);\r\n        bytes35 scriptBytecode = new LockingBytecodeP2SH32(adminLockingHash256);\r\n        require(tx.outputs[0].lockingBytecode == scriptBytecode);\r\n    }\r\n}",
+  "debug": {
+    "bytecode": "5379009c63547a517a8769c451a26900cd517a876900cc02740ea2777767537a519c69c4519c6902aa20537a7e01877e00cd517a87777768",
+    "sourceMap": "5:4:10:5;;;;;6:16:6:27;;:31::42;;:16:::1;:8::44;7:16:7:33:0;:37::38;:16:::1;:8::40;8:27:8:28:0;:16::45:1;:49::69:0;;:16:::1;:8::71;9:27:9:28:0;:16::35:1;:39::43:0;:16:::1;5:4:10:5;;;12::17::0;;;;;14:16:14:33;:37::38;:16:::1;:8::40;15:33:15:79:0;:59::78;;:33::79:1;;;16:27:16:28:0;:16::45:1;:49::63:0;;:16:::1;12:4:17:5;;4:0:18:1",
+    "logs": [],
+    "requires": [
+      {
+        "ip": 13,
+        "line": 6
+      },
+      {
+        "ip": 17,
+        "line": 7
+      },
+      {
+        "ip": 23,
+        "line": 8
+      },
+      {
+        "ip": 28,
+        "line": 9
+      },
+      {
+        "ip": 39,
+        "line": 14
+      },
+      {
+        "ip": 51,
+        "line": 16
+      }
+    ]
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.10.5"
+  },
+  "updatedAt": "2025-07-02T04:08:32.817Z"
+}

@@ -1,0 +1,18 @@
+pragma cashscript ^0.10.0;
+
+// Room creation contract
+contract RoomCreate(bytes roomIdBytes, bytes payeeLockingBytecode, bytes32 adminLockingHash256) {
+    function pay(bytes roomIdCheck) {
+        require(roomIdCheck == roomIdBytes);
+        require(tx.outputs.length >= 1);
+        require(tx.outputs[0].lockingBytecode == payeeLockingBytecode);
+        require(tx.outputs[0].value >= 3700); // Minimum 0.000037 BCH
+    }
+
+    function withdraw() {
+        // Only allow withdrawal if all funds go to the admin's UserWallet (P2SH32)
+        require(tx.outputs.length == 1);
+        bytes35 scriptBytecode = new LockingBytecodeP2SH32(adminLockingHash256);
+        require(tx.outputs[0].lockingBytecode == scriptBytecode);
+    }
+}

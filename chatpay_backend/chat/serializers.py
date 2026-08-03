@@ -6,6 +6,12 @@ from django.contrib.auth.password_validation import validate_password
 from .models import CustomUser, Room, Message, RoomInvite
 User = get_user_model()
 
+# for room members
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username']
+
 # --- Registration Serializer ---
 class RegisterSerializers(serializers.Serializer):
     username         = serializers.CharField(max_length=150)
@@ -47,7 +53,6 @@ class RegisterSerializers(serializers.Serializer):
             "id":            user.id,
             "username":      user.username,
             "email":         user.email,
-            "bch_address":   profile.bch_address,
             "token_address": profile.token_address,
             "date_joined":   user.date_joined
         }
@@ -71,6 +76,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
 # ─── Room and RoomInvite Serializers ────────────────────────────────────────
 class RoomSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source='uuid', read_only=True)
     created_by   = UserPreviewSerializer(read_only=True)
     participants = serializers.SlugRelatedField(
         many=True,
@@ -81,7 +87,8 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ['id', 'name', 'created_by', 'participants', 'created_at', 'last_message']
+        fields = ['id', 'name', 'created_by', 'participants', 'created_at', 'last_message',
+                 'min_balance_required', 'message_fee', 'max_participants']
         read_only_fields = ['id', 'created_at', 'last_message']
 
     def get_last_message(self, obj):
@@ -89,6 +96,7 @@ class RoomSerializer(serializers.ModelSerializer):
         if last:
             return MessageSerializer(last).data
         return None
+
 class RoomInviteSerializer(serializers.ModelSerializer):
     created_by = serializers.CharField(source='created_by.username', read_only=True)
     room = serializers.SlugRelatedField(slug_field='name', queryset=Room.objects.all())
@@ -111,19 +119,14 @@ class JoinRoomSerializer(serializers.Serializer):
         return value
     
 class RoomCreateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source='uuid', required=False)
     class Meta:
         model = Room
-        fields = ['id', 'name'
-        ]
-        read_only_fields=['id']
+        fields = ['id', 'name', 'contract_address', 'min_balance_required', 'message_fee', 'max_participants']
+        read_only_fields = []
 
 
 class ProfileSerializer(serializers.ModelSerializer):
-    bch_address   = serializers.CharField(
-        source='profile.bch_address',
-        allow_blank=True,
-        required=False
-    )
     token_address = serializers.CharField(
         source='profile.token_address',
         allow_blank=True,
@@ -134,10 +137,18 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model  = User
         fields = [
-            'id', 'username', 'email',
-            'bch_address', 'token_address', 'avatar_url'
+            'id', 'username', 'email', 'token_address', 'avatar_url'
         ]
         read_only_fields = ['id', 'email', 'avatar_url']
+
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop('profile', {})
+        token_address = profile_data.get('token_address')
+        if token_address is not None:
+            profile, _ = CustomUser.objects.get_or_create(user=instance)
+            profile.token_address = token_address
+            profile.save()
+        return super().update(instance, validated_data)
 
     def get_avatar_url(self, user):
         # safely handle missing profile or missing avatar
@@ -175,3 +186,21 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class AvatarSerializer(serializers.Serializer):
     avatar = serializers.ImageField()
+
+
+class RoomSettingsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating room settings (admin only)
+    """
+    class Meta:
+        model = Room
+        fields = ['min_balance_required', 'message_fee','max_participants']
+        
+    def validate_min_balance_required(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Minimum balance cannot be negative.")
+        return value
+    def validate_message_fee(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Message fee cannot be negative.")
+        return value

@@ -8,6 +8,17 @@
       </div>
       <q-space />
 
+      <!-- Balance display -->
+      <div class="balance-display row items-center q-mr-md" @click.stop="refreshBalance">
+        <q-icon
+          :name="isRefreshingBalance ? 'mdi-sync' : 'mdi-currency-btc'"
+          size="16px"
+          :color="isRefreshingBalance ? 'orange' : 'primary'"
+          :class="{ 'rotate-360': isRefreshingBalance }"
+        />
+        <span class="text-caption text-primary q-ml-xs">{{ balance }} BCH</span>
+      </div>
+
       <!-- Settings menu -->
       <q-btn
         dense
@@ -25,10 +36,27 @@
               <q-icon name="link" />
             </q-item-section>
           </q-item>
-          <q-item clickable v-close-popup @click="openRenameDialog">
+          <q-item v-if="meId === createdById" clickable v-close-popup @click="openRenameDialog">
             <q-item-section>Rename Room</q-item-section>
             <q-item-section avatar>
               <q-icon name="edit" />
+            </q-item-section>
+          </q-item>
+          <q-item clickable v-close-popup @click="manageChatMembers">
+            <q-item-section>Member List</q-item-section>
+            <q-item-section avatar>
+              <q-icon name="people" />
+            </q-item-section>
+          </q-item>
+          <q-item
+            v-if="meId === createdById"
+            clickable
+            v-close-popup
+            @click="openRoomSettingsDialog"
+          >
+            <q-item-section>Room Settings</q-item-section>
+            <q-item-section avatar>
+              <q-icon name="settings" />
             </q-item-section>
           </q-item>
           <q-separator />
@@ -65,7 +93,7 @@
             v-else-if="messages.length === 0"
             class="text-caption text-grey-6 text-center q-py-lg"
           >
-            No messages yet. Say hello!
+            No messages yet.
           </div>
 
           <template v-else>
@@ -75,7 +103,7 @@
               class="row q-mb-sm"
               :class="msg.senderId === meId ? 'justify-end' : 'justify-start'"
             >
-              <div class="column" style="max-width: 80%">
+              <div class="column" style="max-width: 80%; position: relative">
                 <div
                   v-if="shouldShowSender(msg, index)"
                   class="sender-name text-left text-grey-7 q-pl-2"
@@ -83,9 +111,12 @@
                   {{ msg.senderName }}
                 </div>
                 <div
-                  class="row items-end"
+                  class="row items-end no-wrap"
                   :class="msg.senderId === meId ? 'justify-end' : 'justify-start'"
                 >
+                  <div v-if="msg.senderId === meId && msg.pending" class="msg-side-spinner q-mr-xs">
+                    <q-spinner size="16px" color="primary" />
+                  </div>
                   <div class="msg-bubble" :class="msg.senderId === meId ? 'me' : 'other'">
                     <div class="text-body2">{{ msg.content }}</div>
                     <div class="message-time">
@@ -114,7 +145,7 @@
           bg-color="white"
           @keyup.enter="sendMessage"
         />
-        <q-btn dense flat round icon="insert_emoticon" class="text-grey-7" />
+        <!-- <q-btn dense flat round icon="insert_emoticon" class="text-grey-7" /> -->
         <q-btn
           dense
           flat
@@ -158,6 +189,104 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- Chat Members Dialog -->
+    <q-dialog v-model="chatMembersDialog">
+      <q-card style="width: 400px; max-width: 90vw">
+        <q-card-section class="row items-center">
+          <div class="text-h6">Room Members</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section>
+          <q-list>
+            <q-item v-for="member in members" :key="member.id">
+              <q-item-section>
+                <div>
+                  {{ member.username }}
+                  <span v-if="member.id === adminId" class="q-ml-xs text-primary text-caption"
+                    >(admin)</span
+                  >
+                  <span v-else class="q-ml-xs text-grey-6 text-caption">(member)</span>
+                </div>
+                <div class="text-caption text-grey-6">{{ member.email }}</div>
+              </q-item-section>
+              <q-item-section side v-if="meId == adminId && member.id !== adminId">
+                <q-btn
+                  dense
+                  flat
+                  icon="remove_circle"
+                  color="negative"
+                  @click="removeMember(member.id)"
+                  title="Remove from room"
+                />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+    <!-- Room Settings Dialog -->
+    <q-dialog v-model="roomSettingsDialog">
+      <q-card style="width: 400px">
+        <q-card-section class="row items-center">
+          <div class="text-h6">Room Settings</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section>
+          <div class="text-subtitle2 q-mb-sm">Max Number of Participants</div>
+          <q-input
+            v-model.number="maxParticipants"
+            type="number"
+            label="Maximum users"
+            min="0"
+            class="q-mt-md"
+            @keyup.enter="saveRoomSettings"
+          />
+          <div class="text-caption text-grey-6 q-mt-xs">0 means unlimited users.</div>
+          <div class="text-subtitle2 q-mb-sm">Minimum Balance Requirement</div>
+          <q-input
+            v-model.number="minBalanceRequired"
+            type="number"
+            label="Minimum BCH balance to join"
+            suffix="BCH"
+            step="0.00001"
+            min="0"
+            autofocus
+            @keyup.enter="saveRoomSettings"
+          />
+          <div class="text-caption text-grey-6 q-mt-sm">
+            Users must have at least this amount of BCH to join this room.
+          </div>
+          <q-input
+            v-model.number="messageFee"
+            type="number"
+            label="Message fee per message"
+            suffix="BCH"
+            step="0.000001"
+            min="0"
+            class="q-mt-md"
+            @keyup.enter="saveRoomSettings"
+          />
+          <div class="text-caption text-grey-6 q-mt-xs">
+            Users must pay this amount of BCH to send each message in this room.
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" color="grey" v-close-popup />
+          <q-btn
+            flat
+            label="Save"
+            color="primary"
+            :disable="minBalanceRequired < 0"
+            @click="saveRoomSettings"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -166,6 +295,10 @@ import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Notify } from 'quasar'
 import axios from 'axios'
+import UserWalletService from '../services/cashscript-service.js'
+import RoomCreateArtifact from '../contracts/RoomCreate.json'
+import { Contract, ElectrumNetworkProvider, Network } from 'cashscript'
+import { decodeCashAddress } from '@bitauth/libauth'
 
 const route = useRoute()
 const router = useRouter()
@@ -178,13 +311,30 @@ const createdById = ref(null)
 const settingsMenu = ref(false)
 const renameDialog = ref(false)
 const newRoomName = ref('')
+const roomSettingsDialog = ref(false)
+const minBalanceRequired = ref(0.00018)
+const chatMembersDialog = ref(false)
+const members = ref([])
+const adminId = ref(null)
 const newMsg = ref('')
 const messages = ref([])
 const meId = ref(null)
 const meName = ref('')
+const maxParticipants = ref(0)
 let socket = ref(null)
 
+// Balance functionality
+const balance = ref('0.00000')
+const isRefreshingBalance = ref(false)
+let walletSvc = null
+
 let inviteCode = ''
+const roomUuid = ref('')
+const roomContractAddress = ref('')
+
+// Add a reactive variable for message fee
+const messageFee = ref(0.000018)
+
 // helper to show sender only on first of a block
 function shouldShowSender(msg, index) {
   if (msg.senderId === meId.value) return false
@@ -212,50 +362,39 @@ function connectWebSocket() {
 
   socket.value.onopen = () => {
     console.log('WebSocket connected')
-    const token = localStorage.getItem('access')
-    if (token) {
-      socket.value.send(
-        JSON.stringify({
-          type: 'auth',
-          token: token,
-        }),
-      )
-    }
   }
 
-  socket.value.onmessage = (e) => {
+  socket.value.onmessage = async (e) => {
     try {
       const data = JSON.parse(e.data)
-      console.log('📨 Received WebSocket message:', data)
-
-      // Handle auth response
-      if (data.type === 'auth_success') {
-        console.log('✅ WebSocket authentication successful')
-        return
+      // If this is a message from me and I have a pending message with the same content, update it
+      if (data.message && data.sender_id === meId.value) {
+        const pendingIdx = messages.value.findIndex((m) => m.content === data.message && m.pending)
+        if (pendingIdx !== -1) {
+          // Replace the pending message with the confirmed one from backend
+          messages.value[pendingIdx] = {
+            id: data.id || Date.now() + Math.random(),
+            content: data.message,
+            senderId: data.sender_id,
+            senderName: data.sender_name || meName.value,
+            timestamp: data.timestamp || new Date().toISOString(),
+            pending: false,
+          }
+          await refreshBalance()
+          scrollToBottom()
+          return
+        }
       }
-
-      if (data.type === 'auth_error') {
-        console.error('❌ WebSocket authentication failed:', data.message)
-        return
-      }
-
-      // Handle regular chat messages
-      if (data.message) {
-        console.log('💬 Adding message to chat:', {
-          content: data.message,
-          senderId: data.sender_id,
-          senderName: data.sender_name,
-        })
-
-        messages.value.push({
-          id: Date.now() + Math.random(), // Ensure unique ID
-          content: data.message,
-          senderId: data.sender_id,
-          senderName: data.sender_name || `User ${data.sender_id}`,
-          timestamp: data.timestamp || new Date().toISOString(),
-        })
-        scrollToBottom()
-      }
+      // Only push if it's not a duplicate of a pending message
+      messages.value.push({
+        id: data.id || Date.now() + Math.random(),
+        content: data.message,
+        senderId: data.sender_id,
+        senderName: data.sender_name,
+        timestamp: data.timestamp,
+        pending: false,
+      })
+      scrollToBottom()
     } catch (err) {
       console.error('❌ Error parsing WebSocket message:', err)
     }
@@ -317,12 +456,103 @@ async function loadRoom() {
   })
   roomName.value = data.name
   createdById.value = data.created_by.id
+  roomUuid.value = data.id // UUID string
+  roomContractAddress.value = data.contract_address
+  minBalanceRequired.value = data.min_balance_required || 0.00018
+  messageFee.value = data.message_fee || 0.000018
+  maxParticipants.value = data.max_participants || 0
+  console.log('Room data:', data)
+  console.log('Room contract address from backend:', data.contract_address)
+}
+
+async function manageChatMembers() {
+  settingsMenu.value = false
+  chatMembersDialog.value = true
+  await loadRoomMembers()
+}
+
+async function loadRoomMembers() {
+  try {
+    const token = localStorage.getItem('access')
+    const { data } = await axios.get(`/api/rooms/${roomId}/members/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    members.value = data.members
+    adminId.value = data.admin_id
+  } catch (err) {
+    console.error(err)
+    Notify.create({
+      message: 'Failed to load members',
+      color: 'negative',
+      position: 'bottom',
+    })
+  }
+}
+
+async function removeMember(memberId) {
+  if (!window.confirm('Remove this member from the room?')) return
+  try {
+    const token = localStorage.getItem('access')
+    await axios.post(
+      `/api/rooms/${roomId}/remove_member/`,
+      { member_id: memberId },
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    members.value = members.value.filter((m) => m.id !== memberId)
+    Notify.create({
+      message: 'Member removed',
+      color: 'positive',
+      position: 'bottom',
+      timeout: 2000,
+    })
+  } catch (err) {
+    console.error(err)
+    Notify.create({
+      message: 'Failed to remove member',
+      color: 'negative',
+      position: 'bottom',
+    })
+  }
 }
 
 function openRenameDialog() {
   newRoomName.value = roomName.value
   settingsMenu.value = false
   renameDialog.value = true
+}
+
+function openRoomSettingsDialog() {
+  settingsMenu.value = false
+  roomSettingsDialog.value = true
+}
+
+async function saveRoomSettings() {
+  try {
+    const token = localStorage.getItem('access')
+    await axios.patch(
+      `/api/rooms/${roomId}/settings/`,
+      {
+        min_balance_required: minBalanceRequired.value,
+        message_fee: messageFee.value,
+        max_participants: maxParticipants.value,
+      },
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    roomSettingsDialog.value = false
+    Notify.create({
+      message: 'Room settings updated successfully',
+      color: 'positive',
+      position: 'bottom',
+      timeout: 2000,
+    })
+  } catch (error) {
+    console.error('Failed to update room settings:', error)
+    Notify.create({
+      message: 'Failed to update room settings',
+      color: 'negative',
+      position: 'bottom',
+    })
+  }
 }
 
 async function renameRoom() {
@@ -344,21 +574,115 @@ async function renameRoom() {
   })
 }
 
-function confirmDelete() {
-  if (!window.confirm('Are you sure you want to delete this room? This cannot be undone.')) return
-  deleteRoom()
+// Helper for locking bytecode
+function addressToLockingBytecode(address) {
+  const decoded = decodeCashAddress(address)
+  if (!decoded || !decoded.payload) {
+    throw new Error(`Invalid CashAddress: ${address}`)
+  }
+  const { payload, type } = decoded
+  // handle numeric or string types
+  if (type === 0 || type === 'p2pkh') {
+    // P2PKH → OP_DUP OP_HASH160 <20> OP_EQUALVERIFY OP_CHECKSIG
+    return new Uint8Array([0x76, 0xa9, 0x14, ...payload, 0x88, 0xac])
+  }
+  if (type === 1 || type === 'p2sh') {
+    // P2SH → OP_HASH160 <20> OP_EQUAL
+    return new Uint8Array([0xa9, 0x14, ...payload, 0x87])
+  }
+  throw new Error(`Unsupported address type: ${type}`)
 }
 
-async function deleteRoom() {
-  const token = localStorage.getItem('access')
-  await axios.delete(`/api/rooms/${roomId}/`, { headers: { Authorization: `Bearer ${token}` } })
-  router.push('/home')
-  Notify.create({
-    message: 'Room deleted successfully',
-    color: 'positive',
-    position: 'bottom',
-    timeout: 2000,
-  })
+async function withdrawAndDeleteRoom() {
+  try {
+    // 1. Get admin wallet info
+    const token = localStorage.getItem('access')
+    const { data: profile } = await axios.get('/api/profile/', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const username = profile.username
+    const userId = profile.id
+    const userWallet = new UserWalletService(username, userId)
+    // Get the UserWallet contract address and extract the 32-byte hash256
+    const userWalletContractAddress = userWallet.getAddress()
+    const decoded = decodeCashAddress(userWalletContractAddress)
+    const adminLockingHash256 = decoded.payload
+
+    // 2. Prepare contract args
+    const roomIdBytes = new TextEncoder().encode(roomUuid.value)
+    // You need to use the same payee address as at creation
+    const payeeAddress = 'bitcoincash:qp5le2vn7hjs73tlgskfdswzy60s908ly5wtll9lm9' // update if dynamic
+    const payeeLockingBytecode = addressToLockingBytecode(payeeAddress)
+
+    // 3. Load the contract
+    const provider = new ElectrumNetworkProvider(Network.MAINNET)
+
+    // Use the stored contract address if available, otherwise recreate
+    let roomCreateContract
+    if (roomContractAddress.value) {
+      // Use the stored contract address
+      roomCreateContract = new Contract(
+        RoomCreateArtifact,
+        [roomIdBytes, payeeLockingBytecode, adminLockingHash256],
+        { provider, address: roomContractAddress.value },
+      )
+    } else {
+      // Recreate the contract (fallback)
+      roomCreateContract = new Contract(
+        RoomCreateArtifact,
+        [roomIdBytes, payeeLockingBytecode, adminLockingHash256],
+        { provider },
+      )
+    }
+
+    // 4. Get contract UTXOs and calculate total
+    const utxos = await roomCreateContract.getUtxos()
+    const totalSats = utxos.reduce((sum, u) => sum + BigInt(u.satoshis), 0n)
+
+    if (totalSats === 0n) {
+      Notify.create({ type: 'info', message: 'No funds to withdraw.' })
+    } else if (totalSats <= 1000n) {
+      Notify.create({
+        type: 'info',
+        message: `Contract has only ${totalSats} sats (${(Number(totalSats) / 1e8).toFixed(8)} BCH), which is less than the withdrawal fee.`,
+      })
+    } else {
+      // 5. Withdraw all funds to admin
+      Notify.create({
+        type: 'info',
+        message: `Processing withdrawal of ${(Number(totalSats - 1000n) / 1e8).toFixed(8)} BCH...`,
+      })
+
+      // Use the admin wallet address - CashScript will handle the conversion
+      const adminWalletAddress = userWallet.getAddress()
+
+      await roomCreateContract.functions
+        .withdraw()
+        .to(adminWalletAddress, totalSats - 1000n)
+        .withHardcodedFee(1000n)
+        .withoutChange()
+        .send()
+      Notify.create({
+        type: 'positive',
+        message: `Funds withdrawn to your wallet: ${(Number(totalSats - 1000n) / 1e8).toFixed(8)} BCH`,
+      })
+    }
+
+    // 6. Delete the room via backend
+    await axios.delete(`/api/rooms/${roomId}/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    Notify.create({ type: 'positive', message: 'Room deleted successfully' })
+    router.push('/home')
+  } catch (err) {
+    console.error('Withdraw/Delete failed:', err)
+    Notify.create({ type: 'negative', message: 'Failed to withdraw or delete room.' })
+  }
+}
+
+function confirmDelete() {
+  if (!window.confirm('Are you sure you want to delete this room? This cannot be undone.')) return
+  withdrawAndDeleteRoom()
 }
 
 function confirmLeave() {
@@ -428,31 +752,39 @@ async function loadMessages() {
 onMounted(() => {
   loadMessages()
   loadRoom()
+  loadContractAndBalance()
   connectWebSocket()
 })
 
+// Add a helper to generate a temporary ID for pending messages
+function generateTempId() {
+  return 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+}
+
+// Update sendMessage to add a pending message
 async function sendMessage() {
   const text = newMsg.value.trim()
-  if (!text || !socket.value || socket.value.readyState !== WebSocket.OPEN) {
-    console.log('Cannot send message:', {
-      hasText: !!text,
-      hasSocket: !!socket.value,
-      socketState: socket.value?.readyState,
-    })
-    return
-  }
+  if (!text || !socket.value || socket.value.readyState !== WebSocket.OPEN) return
 
-  console.log('🚀 Sending message via WebSocket:', text)
+  // 1. Add the message to the UI immediately with pending: true and a tempId
+  const tempId = generateTempId()
+  messages.value.push({
+    id: tempId,
+    content: text,
+    senderId: meId.value,
+    senderName: meName.value,
+    timestamp: new Date().toISOString(),
+    pending: true,
+  })
+  scrollToBottom()
 
-  // Send message via WebSocket instead of HTTP API
-  socket.value.send(
-    JSON.stringify({
-      message: text,
-    }),
-  )
+  // 2. Send the message via WebSocket, including the message fee if needed
+  // If your backend expects the fee in the payload, include it:
+  // socket.value.send(JSON.stringify({ message: text, fee: messageFee.value }))
+  // If not, just send the message as before:
+  socket.value.send(JSON.stringify({ message: text }))
 
   newMsg.value = ''
-  console.log('✅ Message sent, input cleared')
 }
 
 function goBack() {
@@ -466,6 +798,43 @@ function formatTime(iso) {
     minute: '2-digit',
     hour12: true,
   })
+}
+
+// Balance functionality
+async function loadContractAndBalance() {
+  try {
+    isRefreshingBalance.value = true
+    const token = localStorage.getItem('access')
+    if (!token) throw new Error('Missing access token')
+    // Fetch user profile from backend
+    const { data: profile } = await axios.get('/api/profile/', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const username = profile.username
+    const userId = profile.id
+    console.log('UserWalletService args:', username, userId)
+
+    // 1) new service instance
+    walletSvc = new UserWalletService(username, userId)
+
+    // 2) read address & balance
+    balance.value = await walletSvc.getBalance()
+  } catch (loadError) {
+    console.error(loadError)
+    Notify.create({
+      type: 'negative',
+      message: 'Failed to load wallet balance',
+    })
+    balance.value = '0.00000'
+  } finally {
+    isRefreshingBalance.value = false
+  }
+}
+
+async function refreshBalance() {
+  if (!isRefreshingBalance.value) {
+    await loadContractAndBalance()
+  }
 }
 </script>
 
@@ -562,5 +931,36 @@ function formatTime(iso) {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border-radius: 8px;
   overflow: hidden;
+}
+
+.balance-display {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 16px;
+  background-color: rgba(0, 150, 136, 0.1);
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: rgba(0, 150, 136, 0.2);
+  }
+}
+
+.rotate-360 {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.msg-side-spinner {
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
 </style>
